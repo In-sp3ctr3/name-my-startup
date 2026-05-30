@@ -39,12 +39,12 @@ const signupHref = "/start";
 const loginHref = "/login";
 
 const logoStrip = [
-  { name: "Short", mark: "linear" },
-  { name: "Clear", mark: "brex" },
-  { name: "Memorable", mark: "vercel" },
-  { name: "Distinct", mark: "descript" },
-  { name: "Easy to say", mark: "ramp" },
-  { name: "Ready to check", mark: "notion" }
+  { name: "Short", mark: "corner" },
+  { name: "Clear", mark: "spark" },
+  { name: "Memorable", mark: "peak" },
+  { name: "Distinct", mark: "bars" },
+  { name: "Easy to say", mark: "wave" },
+  { name: "Ready to check", mark: "checkbox" }
 ];
 
 const logoMarqueeItems = [...logoStrip, ...logoStrip, ...logoStrip];

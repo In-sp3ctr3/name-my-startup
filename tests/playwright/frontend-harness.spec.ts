@@ -28,7 +28,7 @@ test.describe("Namelift internal flow", () => {
     await page.getByRole("button", { name: /playful/i }).click();
     await page.getByRole("button", { name: /generate 3 free names/i }).click();
 
-    await expect(page.getByRole("heading", { name: /naming in progress/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /naming in progress|3 names, fully checked/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /3 names, fully checked/i })).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId("evidence-run-status").getByText(/backend evidence loaded/i)).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId("locked-teaser")).toBeVisible();

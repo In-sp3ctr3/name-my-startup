@@ -4,6 +4,36 @@ import type { ProviderAdapter, ProviderInput } from "@/server/providers/types";
 import { lookupCommonCrawlSignals, lookupDnsSignals, lookupRdapDomain, normalizedDomainName, now } from "@/server/providers/evidence";
 
 const providerInputSchema = z.custom<ProviderInput>();
+const socialPlatforms = [
+  { key: "x", label: "X", url: (handle: string) => `https://x.com/${handle}` },
+  { key: "instagram", label: "Instagram", url: (handle: string) => `https://www.instagram.com/${handle}/` },
+  { key: "tiktok", label: "TikTok", url: (handle: string) => `https://www.tiktok.com/@${handle}` },
+  { key: "linkedin", label: "LinkedIn", url: (handle: string) => `https://www.linkedin.com/company/${handle}/` },
+  { key: "youtube", label: "YouTube", url: (handle: string) => `https://www.youtube.com/@${handle}` }
+] as const;
+
+function normalizedHandle(name: string) {
+  return name.toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 28) || "name";
+}
+
+async function fetchSocialProfileStatus(url: string, timeoutMs = 3500) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      method: "GET",
+      redirect: "manual",
+      signal: controller.signal,
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "User-Agent": "NameliftAvailabilityBot/0.1"
+      },
+      cache: "no-store"
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export const rdapDomainAdapter: ProviderAdapter = {
   provider: "rdap-domain-signals",
@@ -217,4 +247,112 @@ export const braveSearchAdapter: ProviderAdapter = {
   }
 };
 
-export const realProviderAdapters = [rdapDomainAdapter, dnsDomainAdapter, commonCrawlWebAdapter, usptoPublicRecordAdapter, braveSearchAdapter];
+export const publicSocialProfileAdapter: ProviderAdapter = {
+  provider: "public-social-profile-signals",
+  version: "0.1.0",
+  checkType: "social",
+  inputSchema: providerInputSchema,
+  async run({ candidate, brief }) {
+    const handle = normalizedHandle(candidate.name);
+    if (!realProvidersEnabled) {
+      return socialPlatforms.map((platform) => ({
+        provider: this.provider,
+        providerVersion: this.version,
+        checkType: this.checkType,
+        label: "source_not_checked",
+        source: `${platform.label} public profile`,
+        query: `${platform.key} @${handle}`,
+        jurisdiction: brief.geography,
+        matchedFields: [],
+        summary: "Public social profile lookup is disabled for this environment.",
+        confidence: "unknown",
+        freshness: "not-checked",
+        occurredAt: now()
+      }));
+    }
+
+    return Promise.all(
+      socialPlatforms.map(async (platform) => {
+        const url = platform.url(handle);
+        try {
+          const response = await fetchSocialProfileStatus(url);
+          if (response.status === 404 || response.status === 410) {
+            return {
+              provider: this.provider,
+              providerVersion: this.version,
+              checkType: this.checkType,
+              label: "no_obvious_conflict_found_in_this_screen",
+              source: `${platform.label} public profile`,
+              query: `${platform.key} @${handle}`,
+              jurisdiction: brief.geography,
+              matchedFields: [],
+              summary: `${platform.label} returned a not-found response for this public handle screen. Platform behavior can change, so verify before launch.`,
+              confidence: "low",
+              freshness: "live",
+              occurredAt: now()
+            };
+          }
+
+          if ((response.status >= 200 && response.status < 400) || response.status === 401 || response.status === 403) {
+            return {
+              provider: this.provider,
+              providerVersion: this.version,
+              checkType: this.checkType,
+              label: response.status >= 200 && response.status < 400 ? "possible_conflict_found" : "inconclusive_result",
+              source: `${platform.label} public profile`,
+              query: `${platform.key} @${handle}`,
+              jurisdiction: brief.geography,
+              matchedFields: [`HTTP ${response.status}`],
+              summary:
+                response.status >= 200 && response.status < 400
+                  ? `${platform.label} returned a live public response for this handle, so treat it as a review signal.`
+                  : `${platform.label} blocked or challenged the lookup, so this handle cannot be treated as available.`,
+              confidence: response.status >= 200 && response.status < 400 ? "medium" : "unknown",
+              freshness: "live",
+              occurredAt: now()
+            };
+          }
+
+          return {
+            provider: this.provider,
+            providerVersion: this.version,
+            checkType: this.checkType,
+            label: "inconclusive_result",
+            source: `${platform.label} public profile`,
+            query: `${platform.key} @${handle}`,
+            jurisdiction: brief.geography,
+            matchedFields: [`HTTP ${response.status}`],
+            summary: `${platform.label} returned an inconclusive response for this public handle screen.`,
+            confidence: "unknown",
+            freshness: "live",
+            occurredAt: now()
+          };
+        } catch {
+          return {
+            provider: this.provider,
+            providerVersion: this.version,
+            checkType: this.checkType,
+            label: "provider_error",
+            source: `${platform.label} public profile`,
+            query: `${platform.key} @${handle}`,
+            jurisdiction: brief.geography,
+            matchedFields: [],
+            summary: `${platform.label} public handle lookup failed and cannot be treated as favorable evidence.`,
+            confidence: "unknown",
+            freshness: "live",
+            occurredAt: now()
+          };
+        }
+      })
+    );
+  }
+};
+
+export const realProviderAdapters = [
+  rdapDomainAdapter,
+  dnsDomainAdapter,
+  commonCrawlWebAdapter,
+  usptoPublicRecordAdapter,
+  braveSearchAdapter,
+  publicSocialProfileAdapter
+];

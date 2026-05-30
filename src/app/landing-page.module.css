@@ -6,8 +6,10 @@
 }
 
 .site-header {
-  width: min(var(--header-container), calc(100% - 48px));
-  margin-inline: auto;
+  width: 100%;
+  margin-inline: 0;
+  padding-inline: max(24px, calc((100% - var(--header-container, var(--container))) / 2));
+  box-sizing: border-box;
 }
 
 .side-scroll-assets {
@@ -36,9 +38,9 @@
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   min-height: 64px;
-  background: rgba(255, 255, 255, 0.93);
-  border-bottom: 1px solid rgba(220, 228, 239, 0.9);
-  backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid rgba(220, 228, 239, 0.68);
+  backdrop-filter: blur(24px) saturate(1.28);
 }
 
 .brand {
@@ -444,7 +446,7 @@
 }
 
 .name-icon.violet {
-  background: linear-gradient(135deg, #681dff, #064cff);
+  background: linear-gradient(135deg, #0b6fff, #0aa893);
 }
 
 .name-icon.teal {
@@ -483,9 +485,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 18px;
-  padding: 0 9px;
-  font-size: 9px;
+  min-height: 22px;
+  padding: 0 10px;
+  font-size: 11px;
   font-weight: 800;
   border-radius: 999px;
 }
@@ -514,7 +516,7 @@
   align-items: center;
   gap: 7px;
   color: #111827;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 800;
   white-space: nowrap;
 }
@@ -607,18 +609,32 @@
   color: #53647d;
 }
 
-.logo-mark.linear {
-  border-radius: 50%;
-  background: repeating-linear-gradient(45deg, #53647d 0 2px, transparent 2px 4px);
+.logo-mark.corner {
+  border-bottom: 3px solid currentColor;
+  border-left: 3px solid currentColor;
 }
 
-.logo-mark.brex {
-  border: 3px solid currentColor;
-  border-top-width: 0;
-  border-right-width: 0;
+.logo-mark.spark::before,
+.logo-mark.spark::after {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 18px;
+  height: 3px;
+  content: "";
+  background: currentColor;
+  border-radius: 999px;
+  transform: translate(-50%, -50%) rotate(var(--spark-rotate));
 }
 
-.logo-mark.vercel {
+.logo-mark.spark::before {
+  --spark-rotate: 0deg;
+}
+
+.logo-mark.spark::after {
+  --spark-rotate: 90deg;
+}
+
+.logo-mark.peak {
   width: 0;
   height: 0;
   border-right: 9px solid transparent;
@@ -626,7 +642,7 @@
   border-left: 9px solid transparent;
 }
 
-.logo-mark.descript {
+.logo-mark.bars {
   width: 18px;
   height: 16px;
   background:
@@ -635,15 +651,15 @@
     linear-gradient(currentColor 0 0) 0 12px / 9px 3px no-repeat;
 }
 
-.logo-mark.ramp::before,
-.logo-mark.ramp::after {
+.logo-mark.wave::before,
+.logo-mark.wave::after {
   position: absolute;
   content: "";
   background: currentColor;
   border-radius: 3px;
 }
 
-.logo-mark.ramp::before {
+.logo-mark.wave::before {
   right: 4px;
   bottom: 3px;
   width: 12px;
@@ -651,7 +667,7 @@
   transform: rotate(-35deg);
 }
 
-.logo-mark.ramp::after {
+.logo-mark.wave::after {
   right: 1px;
   bottom: 3px;
   width: 8px;
@@ -659,7 +675,7 @@
   transform: rotate(35deg);
 }
 
-.logo-mark.notion {
+.logo-mark.checkbox {
   display: inline-grid;
   place-items: center;
   font-size: 12px;
@@ -669,8 +685,13 @@
   border-radius: 2px;
 }
 
-.logo-mark.notion::before {
-  content: "N";
+.logo-mark.checkbox::before {
+  content: "";
+  width: 9px;
+  height: 5px;
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: rotate(-45deg) translate(1px, -1px);
 }
 
 .section-heading {
@@ -865,15 +886,15 @@
 
 .examples-table th,
 .examples-table td {
-  padding: 9px 18px;
+  padding: 16px 20px;
   border-bottom: 1px solid var(--line);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .examples-table th {
   color: #293955;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -899,7 +920,7 @@
 
 .examples-table strong {
   display: block;
-  font-size: 11.5px;
+  font-size: 15px;
   font-weight: 800;
 }
 
@@ -931,12 +952,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 64px;
+  min-width: 82px;
   white-space: nowrap;
-  min-height: 22px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 0 14px;
   color: #151d2d;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   background: linear-gradient(180deg, #fff, #f7f9fc);
   border: 1px solid #dce3ee;
@@ -948,8 +969,10 @@
 }
 
 .examples-link {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  width: fit-content;
   gap: 12px;
   margin: 10px auto 12px;
   color: var(--blue);
@@ -1071,6 +1094,7 @@
 .pricing-card .button {
   width: 100%;
   min-height: 38px;
+  justify-content: center;
   padding-inline: 14px;
   margin-top: auto;
 }
@@ -1415,9 +1439,13 @@
 }
 
 @media (max-width: 680px) {
-  .section-shell,
-  .site-header {
+  .section-shell {
     width: min(100% - 32px, var(--container));
+  }
+
+  .site-header {
+    width: 100%;
+    padding-inline: 16px;
   }
 
   .brand {
@@ -1567,7 +1595,8 @@
   }
 
   .site-header {
-    width: min(var(--header-container), calc(100% - clamp(64px, 7vw, 112px)));
+    width: 100%;
+    padding-inline: max(clamp(32px, 3.5vw, 56px), calc((100% - var(--header-container, var(--container))) / 2));
     min-height: 76px;
   }
 
@@ -1961,13 +1990,13 @@
     box-shadow: 0 24px 58px rgba(7, 92, 255, 0.31), 0 5px 0 rgba(3, 71, 223, 0.22);
   }
 
-  .logo-mark.vercel {
+  .logo-mark.peak {
     border-right-width: 12px;
     border-bottom-width: 23px;
     border-left-width: 12px;
   }
 
-  .logo-mark.notion {
+  .logo-mark.checkbox {
     font-size: 15px;
   }
 

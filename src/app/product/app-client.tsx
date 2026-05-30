@@ -43,6 +43,7 @@ import { useRouter } from "next/navigation";
 import type { CSSProperties, Dispatch, ReactNode, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PRODUCT_OFFER } from "@/lib/product-offer";
+import { clampScore, screeningReviewWeight } from "@/lib/scoring";
 import { SCREENING_LABEL_COPY, type ScreeningLabel } from "@/lib/screening";
 import type { BillingSummary, Candidate, JobRun, Project, ProjectSnapshot, ReportSnapshot, ScreeningRun, ScreeningSourceResult } from "@/lib/types";
 import type { ProjectBriefInput } from "@/lib/schemas";
@@ -190,6 +191,7 @@ type BillingHistoryItem = {
 };
 
 type AsyncStatus = "idle" | "loading" | "ready" | "error";
+type AvailabilityStatus = "clear" | "review" | "not_checked";
 
 type EvidenceSource = Pick<
   ScreeningSourceResult,
@@ -224,8 +226,8 @@ const LOCKED_TEASER_ROWS: LockedTeaserRow[] = [
     style: "Modern",
     score: 92,
     checks: [".com open", "@ handle"],
-    accent: "#6c4bf5",
-    bg: "rgba(108, 75, 245, 0.12)"
+    accent: "#0f8f7e",
+    bg: "rgba(15, 143, 126, 0.12)"
   },
   {
     name: "MotiveRow",
@@ -291,8 +293,8 @@ const generationSteps = [
   { label: "Reading your brief", icon: Cpu },
   { label: "Generating candidate names", icon: Sparkles },
   { label: "Checking .com / .net / .io", icon: Globe },
-  { label: "Scanning social handles", icon: Sparkles },
-  { label: "Cross-checking trademarks", icon: Shield }
+  { label: "Scanning public web + social signals", icon: Sparkles },
+  { label: "Cross-checking trademark signals", icon: Shield }
 ];
 
 const iconByKey: Record<StoredProject["iconKey"], LucideIcon> = {
@@ -325,6 +327,10 @@ function truncateTitle(value: string) {
 
 function newProjectId() {
   return `sprint-${Date.now().toString(36)}`;
+}
+
+function isLocalProjectId(projectId: string) {
+  return projectId.startsWith("sprint-");
 }
 
 function normalizeState(value: unknown): NameliftState {
@@ -508,7 +514,7 @@ function briefForApi(title: string, brief: string, stylesValue: BriefStyle[]): P
     requiredWords: [],
     forbiddenWords: [],
     competitors: [],
-    tlds: [".com", ".ai", ".io"],
+    tlds: [".com", ".net", ".io"],
     lanes: lanesForStyles(stylesValue),
     sensitivity: "standard"
   };
@@ -517,6 +523,13 @@ function briefForApi(title: string, brief: string, stylesValue: BriefStyle[]): P
 function averageScore(candidate: Candidate) {
   const values = Object.values(candidate.scores);
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function evidenceAdjustedScore(candidate: Candidate, results: ScreeningSourceResult[]) {
+  if (!results.length) return averageScore(candidate);
+  const reviewPenalty = screeningReviewWeight(results.map((result) => result.label));
+  const clearSignals = results.filter((result) => isClearScreeningLabel(result.label)).length;
+  return clampScore(averageScore(candidate) - Math.min(34, Math.round(reviewPenalty * 0.45)) + Math.min(6, clearSignals));
 }
 
 function emptyBackendReport(): EvidenceReport {
@@ -656,7 +669,7 @@ function nameItemFromCandidate(candidate: Candidate, index: number, context?: Pr
     id: candidate.id,
     name: candidate.name,
     tagline: candidate.tagline,
-    score: averageScore(candidate),
+    score: context?.useBackendEvidence ? evidenceAdjustedScore(candidate, candidateResults) : averageScore(candidate),
     style: styleByLane[candidate.lane] ?? "Modern",
     slug: candidate.name.toLowerCase().replace(/[^a-z0-9]/g, ""),
     tileColor: ["--tile-purple", "--tile-teal", "--tile-orange", "--tile-blue", "--tile-pink", "--tile-amber"][index % 6],
@@ -1015,6 +1028,14 @@ function ProductAppInner({
           const apiProjects = me.projects.map(projectFromApi);
           const saved = me.savedNames.map((candidate) => candidate.id);
           const savedCandidatesByProject = candidatesByProjectFromApi(me.savedNames);
+          const mergedCandidatesByProject = { ...current.candidatesByProject };
+          Object.entries(savedCandidatesByProject).forEach(([savedProjectId, savedItems]) => {
+            const existing = mergedCandidatesByProject[savedProjectId] ?? [];
+            const existingIds = new Set(existing.map((item) => item.id));
+            mergedCandidatesByProject[savedProjectId] = [...existing, ...savedItems.filter((item) => !existingIds.has(item.id))];
+          });
+          const currentProject = apiProjects.find((project) => project.id === current.currentProjectId) ?? apiProjects[0];
+          const restoreAnonymousFreeProject = Boolean(!me.actor.authenticated && me.freePreviewUsed && currentProject && !current.activeSprint);
           return {
             ...current,
             authed: me.actor.authenticated,
@@ -1022,7 +1043,10 @@ function ProductAppInner({
             projects: apiProjects,
             saved,
             unlockedProjects: apiProjects.filter((project) => project.status === "unlocked").map((project) => project.id),
-            candidatesByProject: { ...current.candidatesByProject, ...savedCandidatesByProject },
+            currentProjectId: restoreAnonymousFreeProject && currentProject ? currentProject.id : current.currentProjectId,
+            title: restoreAnonymousFreeProject && currentProject ? currentProject.title : current.title,
+            brief: restoreAnonymousFreeProject && currentProject ? currentProject.brief : current.brief,
+            candidatesByProject: mergedCandidatesByProject,
             billingHistory: billing?.history ?? [],
             billingCursor: billing?.nextCursor ?? null,
             billingTotal: billing?.total ?? 0,
@@ -1038,6 +1062,19 @@ function ProductAppInner({
       cancelled = true;
     };
   }, [setState, state.authed]);
+
+  useEffect(() => {
+    if (state.authed || state.activeSprint) return;
+    if (activeScreen !== "brief" && activeScreen !== "vibe") return;
+    if (!state.freeUsed) return;
+    const freeProject = state.projects.find((project) => project.id === state.currentProjectId && project.status === "free") ?? state.projects.find((project) => project.status === "free");
+    if (!freeProject || freeProject.id === DEFAULT_PROJECT_ID) return;
+    go("results", {
+      currentProjectId: freeProject.id,
+      title: freeProject.title,
+      brief: freeProject.brief
+    });
+  }, [activeScreen, go, state.activeSprint, state.authed, state.currentProjectId, state.freeUsed, state.projects]);
 
   const shared = { state, setState, go, goLanding, onToast, authSession };
   const requiresAuth = ["dashboard", "saved", "settings", "billing", "reports", "shortlist"].includes(activeScreen);
@@ -1229,7 +1266,7 @@ function TopBar({ route, shared }: { route: RouteKey; shared: SharedProps }) {
               width={250}
               trigger={(open, toggle) => (
                 <button type="button" onClick={toggle} aria-label="Open account menu" className={cx(styles.iconButton, open && styles.iconButtonActive)} style={{ width: "auto", padding: 5 }}>
-                  <span className={styles.tile} style={{ width: 30, height: 30, background: "linear-gradient(135deg,#1f6bff,#6c4bf5)", borderRadius: 9, fontSize: 13, fontWeight: 800 }}>
+                  <span className={styles.tile} style={{ width: 30, height: 30, background: "linear-gradient(135deg,#1f6bff,#0ea5a0)", borderRadius: 9, fontSize: 13, fontWeight: 800 }}>
                     {accountInitials}
                   </span>
                 </button>
@@ -1300,7 +1337,7 @@ function MinimalTop({ shared }: { shared: SharedProps }) {
         ) : null}
         {state.authed ? (
           <button type="button" className={styles.miniButton} onClick={() => go("dashboard")}>
-            <span className={styles.tile} style={{ width: 24, height: 24, background: "linear-gradient(135deg,#1f6bff,#6c4bf5)", borderRadius: 7, fontSize: 11, fontWeight: 800 }}>
+            <span className={styles.tile} style={{ width: 24, height: 24, background: "linear-gradient(135deg,#1f6bff,#0ea5a0)", borderRadius: 7, fontSize: 11, fontWeight: 800 }}>
               AV
             </span>
             Account
@@ -1452,7 +1489,8 @@ function ScreenBrief(shared: SharedProps) {
 function PaperNote() {
   return (
     <div className={styles.paperNote} aria-hidden="true">
-      <Image src="/images/start-sticky-notes-clean.png" alt="" width={1536} height={1024} className={styles.paperImage} priority />
+      <Image src="/images/start-taped-paper-v2.png" alt="" width={1408} height={1117} className={cx(styles.paperImage, styles.paperImageSheet)} priority />
+      <Image src="/images/start-sticky-notes-v2.png" alt="" width={1408} height={1117} className={cx(styles.paperImage, styles.paperImageSticky)} priority />
     </div>
   );
 }
@@ -1461,37 +1499,42 @@ function ScreenGenerating({ state, go }: SharedProps) {
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const taskRef = useRef<{ key: string; promise: Promise<{ route: RouteKey; patch: Partial<NameliftState> }> } | null>(null);
+  const routedKeyRef = useRef<string | null>(null);
   const sprint = state.activeSprint;
-  const paidSprint = sprint?.paidSprint ?? state.payIntent === "newSprint";
+  const paidSprint = Boolean(sprint?.paidSprint || state.payIntent === "newSprint" || state.payIntent === "unlockCurrent");
   const generationKey = `${sprint?.projectId ?? "no-sprint"}:${paidSprint ? "paid" : "free"}`;
 
   useEffect(() => {
-    const per = 720;
+    if (!sprint) {
+      if (!taskRef.current && routedKeyRef.current === null) go(paidSprint ? "success" : "results");
+      return;
+    }
+
+    const activeSprint = sprint;
     let cancelled = false;
-    const timers = generationSteps.map((_, index) => window.setTimeout(() => setStep(index + 1), per * (index + 1)));
 
     async function createAndGenerate() {
-      const active = sprint;
-      if (!active) {
-        return { route: (paidSprint ? "success" : "results") as RouteKey, patch: {} as Partial<NameliftState> };
-      }
+      const active = activeSprint;
 
       let projectId = active.projectId;
       let project = state.projects.find((item) => item.id === projectId);
 
-      if (!project) {
+      if (!project && isLocalProjectId(projectId)) {
+        if (!cancelled) setStep(0);
         const created = await apiJson<{ project: Project }>("/api/projects", {
           method: "POST",
           body: JSON.stringify({
             brief: briefForApi(active.title, active.brief, active.styles),
-            accessType: active.paidSprint ? "paid_pack" : "free_preview"
+            accessType: paidSprint ? "paid_pack" : "free_preview"
           })
         });
         projectId = created.project.id;
         project = projectFromApi(created.project);
+      } else if (!project) {
+        project = projectFromSprint({ ...active, projectId, paidSprint }, paidSprint ? "unlocked" : "free");
       }
 
-      if (active.paidSprint) {
+      if (paidSprint) {
         await apiJson<{ checkoutIntent?: unknown }>("/api/billing/checkout-intents", {
           method: "POST",
           body: JSON.stringify({ projectId })
@@ -1502,6 +1545,7 @@ function ScreenGenerating({ state, go }: SharedProps) {
         });
       }
 
+      if (!cancelled) setStep(1);
       const generated = await apiJson<{ generationRun?: unknown; candidates?: Candidate[]; job?: JobRun; queued?: boolean }>(`/api/projects/${projectId}/generate`, {
         method: "POST",
         body: JSON.stringify({})
@@ -1514,33 +1558,77 @@ function ScreenGenerating({ state, go }: SharedProps) {
         generatedCandidates = generatedSnapshot.candidates;
       }
       if (!generatedCandidates) throw new Error("Generation finished without returning names.");
-      const names = nameItemsFromCandidates(generatedCandidates, {
+      if (!cancelled) setStep(2);
+
+      const existingEvidence = generatedSnapshot?.screeningResults ?? [];
+      if (!existingEvidence.length) {
+        const screened = await apiJson<{ screeningRun?: ScreeningRun; results?: ScreeningSourceResult[]; job?: JobRun; queued?: boolean }>(`/api/projects/${projectId}/screen`, {
+          method: "POST",
+          body: JSON.stringify({})
+        });
+        if (screened.screeningRun && screened.results) {
+          generatedSnapshot = {
+            project: {
+              id: projectId,
+              ownerUserId: "",
+              orgId: "",
+              name: active.title,
+              brief: briefForApi(active.title, active.brief, active.styles),
+              accessType: paidSprint ? "paid_pack" : "free_preview",
+              paidPackStatus: paidSprint ? "paid" : "none",
+              status: "active",
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            },
+            candidates: generatedCandidates,
+            generationRuns: [],
+            screeningRuns: [screened.screeningRun],
+            screeningResults: screened.results,
+            reports: []
+          };
+        } else if (screened.job) {
+          await waitForJob(screened.job.id, "Screening");
+          generatedSnapshot = await loadProjectSnapshot(projectId);
+        } else {
+          throw new Error("Screening finished without returning evidence.");
+        }
+      }
+
+      const screenedResults = generatedSnapshot?.screeningResults ?? [];
+      if (!cancelled && screenedResults.some((result) => result.checkType === "domain")) setStep(3);
+      if (!cancelled && screenedResults.some((result) => result.checkType === "social" || result.checkType === "web")) setStep(4);
+      if (!cancelled && screenedResults.some((result) => result.checkType === "trademark")) setStep(5);
+      if (!cancelled) await wait(180);
+
+      const names = nameItemsFromCandidates(generatedSnapshot?.candidates ?? generatedCandidates, {
         useBackendEvidence: true,
-        screeningResults: generatedSnapshot?.screeningResults ?? []
+        screeningResults: screenedResults,
+        latestRun: latestScreeningRun(generatedSnapshot?.screeningRuns ?? []),
+        latestReport: latestReportSnapshot(generatedSnapshot?.reports ?? [])
       });
-      const status = active.paidSprint ? "unlocked" : "free";
+      const status = paidSprint ? "unlocked" : "free";
       const storedProject: StoredProject = {
         ...(project ?? projectFromSprint(active, status)),
         id: projectId,
         title: active.title,
         brief: active.brief,
-        count: active.paidSprint ? paidNameBatch : freeNameBatch,
+        count: paidSprint ? paidNameBatch : freeNameBatch,
         status,
         when: "Just now",
-        tileColor: active.paidSprint ? "--tile-blue" : "--tile-orange",
-        iconKey: active.paidSprint ? "bolt" : "sparkles"
+        tileColor: paidSprint ? "--tile-blue" : "--tile-orange",
+        iconKey: paidSprint ? "bolt" : "sparkles"
       };
 
       return {
-        route: (active.paidSprint ? "success" : "results") as RouteKey,
+        route: (paidSprint ? "success" : "results") as RouteKey,
         patch: {
-          freeUsed: active.paidSprint ? state.freeUsed : true,
+          freeUsed: paidSprint ? state.freeUsed : true,
           currentProjectId: projectId,
           title: active.title,
           brief: active.brief,
           styles: active.styles,
-          selected: active.paidSprint ? state.selected : null,
-          unlockedProjects: active.paidSprint ? Array.from(new Set([...state.unlockedProjects, projectId])) : state.unlockedProjects,
+          selected: paidSprint ? state.selected : null,
+          unlockedProjects: paidSprint ? Array.from(new Set([...state.unlockedProjects, projectId])) : state.unlockedProjects,
           projects: upsertProject(state.projects, storedProject),
           candidatesByProject: { ...state.candidatesByProject, [projectId]: names },
           screeningRunsByProject: { ...state.screeningRunsByProject, [projectId]: generatedSnapshot?.screeningRuns ?? [] },
@@ -1557,21 +1645,18 @@ function ScreenGenerating({ state, go }: SharedProps) {
       taskRef.current = { key: generationKey, promise: createAndGenerate() };
     }
     const apiTask = taskRef.current.promise;
-    const done = window.setTimeout(() => {
-      void apiTask
-        .then(({ route, patch }) => {
-          if (cancelled) return;
-          go(route, patch);
-        })
-        .catch((caught) => {
-          if (cancelled) return;
-          setError(caught instanceof Error ? caught.message : "Generation failed.");
-        });
-    }, per * (generationSteps.length + 1));
+    void apiTask
+      .then(({ route, patch }) => {
+        if (cancelled || routedKeyRef.current === generationKey) return;
+        routedKeyRef.current = generationKey;
+        go(route, patch);
+      })
+      .catch((caught) => {
+        if (cancelled) return;
+        setError(caught instanceof Error ? caught.message : "Generation failed.");
+      });
     return () => {
       cancelled = true;
-      timers.forEach(window.clearTimeout);
-      window.clearTimeout(done);
     };
   }, [
     go,
@@ -2295,6 +2380,29 @@ function ScoreRing({ score, size = 46 }: { score: number; size?: number }) {
   );
 }
 
+function availabilityStatusFromEvidence(relevant: EvidenceSource[] | undefined, fallbackOk: boolean): AvailabilityStatus {
+  if (!relevant) return fallbackOk ? "clear" : "review";
+  if (!relevant.length) return "not_checked";
+  if (relevant.every((source) => source.label === "source_not_checked" || source.label === "source_unavailable")) return "not_checked";
+  if (relevant.every((source) => isClearScreeningLabel(source.label))) return "clear";
+  return "review";
+}
+
+function domainSourcesFor(evidence: BackendEvidence | undefined, clean: string, tld: "com" | "net" | "io") {
+  const suffix = `.${tld}`;
+  return evidence?.sources.filter((source) => {
+    const query = source.query.toLowerCase();
+    return source.checkType === "domain" && (query.endsWith(suffix) || query.includes(`${clean}${suffix}`));
+  });
+}
+
+function socialSourcesFor(evidence: BackendEvidence | undefined, platform: keyof EvidenceReport["socials"]) {
+  return evidence?.sources.filter((source) => {
+    const haystack = `${source.provider} ${source.source} ${source.query}`.toLowerCase();
+    return source.checkType === "social" && haystack.includes(platform);
+  });
+}
+
 function ReportGrid({ report, name, evidence }: { report: EvidenceReport; name: string; evidence?: BackendEvidence }) {
   const clean = name.toLowerCase().replace(/\s/g, "");
   return (
@@ -2302,14 +2410,14 @@ function ReportGrid({ report, name, evidence }: { report: EvidenceReport; name: 
       <ReportSection label="Domains">
         <div className={styles.chipRow}>
           {(["com", "net", "io"] as const).map((tld) => (
-            <AvailChip key={tld} ok={report.domains[tld]} label={`${clean}.${tld}`} icon={Globe} />
+            <AvailChip key={tld} status={availabilityStatusFromEvidence(domainSourcesFor(evidence, clean, tld), report.domains[tld])} label={`${clean}.${tld}`} icon={Globe} />
           ))}
         </div>
       </ReportSection>
       <ReportSection label="Social handles">
         <div className={styles.chipRow}>
           {socialIcons.map(([key, label, Icon]) => (
-            <AvailChip key={key} ok={report.socials[key]} label={`@${clean}`} icon={Icon} title={label} />
+            <AvailChip key={key} status={availabilityStatusFromEvidence(socialSourcesFor(evidence, key), report.socials[key])} label={`${label}: @${clean}`} icon={Icon} />
           ))}
         </div>
       </ReportSection>
@@ -2385,12 +2493,21 @@ function ReportSection({ label, children }: { label: string; children: ReactNode
   );
 }
 
-function AvailChip({ ok, label, icon: Icon, title }: { ok: boolean; label: string; icon: LucideIcon; title?: string }) {
+function availabilityCopy(status: AvailabilityStatus) {
+  if (status === "clear") return "Likely open";
+  if (status === "not_checked") return "Not checked";
+  return "Needs review";
+}
+
+function AvailChip({ status, label, icon: Icon }: { status: AvailabilityStatus; label: string; icon: LucideIcon }) {
+  const ok = status === "clear";
+  const muted = status === "not_checked";
   return (
-    <span className={cx(styles.availChip, ok && styles.availOk)} title={title}>
+    <span className={cx(styles.availChip, ok && styles.availOk, muted && styles.availMuted)} title={`${label}: ${availabilityCopy(status)}`}>
       <Icon size={15} strokeWidth={1.9} />
       <span style={{ color: ok ? "var(--ink-2)" : "var(--meta)" }}>{label}</span>
-      {ok ? <Check size={13} strokeWidth={2.6} style={{ color: "var(--ok)" }} /> : <X size={12} strokeWidth={2.4} style={{ color: "var(--meta)" }} />}
+      <strong>{availabilityCopy(status)}</strong>
+      {ok ? <Check size={13} strokeWidth={2.6} style={{ color: "var(--ok)" }} /> : <X size={12} strokeWidth={2.4} style={{ color: muted ? "var(--meta)" : "var(--warn)" }} />}
     </span>
   );
 }
@@ -2667,7 +2784,7 @@ function ScreenCheckout(shared: SharedProps) {
             <div style={{ position: "relative" }}>
               <input className={styles.input} placeholder="4242 4242 4242 4242" value={card} onChange={(event) => setCard(event.target.value.replace(/[^\d ]/g, "").slice(0, 19))} />
               <div style={{ position: "absolute", right: 14, top: "50%", display: "flex", gap: 5, transform: "translateY(-50%)" }}>
-                <span style={{ width: 26, height: 17, background: "linear-gradient(135deg,#1f6bff,#6c4bf5)", borderRadius: 4 }} />
+                <span style={{ width: 26, height: 17, background: "linear-gradient(135deg,#1f6bff,#0ea5a0)", borderRadius: 4 }} />
                 <span style={{ width: 26, height: 17, background: "var(--paper-2)", border: "1px solid var(--line)", borderRadius: 4 }} />
               </div>
             </div>
@@ -2703,7 +2820,7 @@ function ScreenCheckout(shared: SharedProps) {
         <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div className={styles.card} style={{ padding: 24, borderRadius: "var(--r-card-lg)" }}>
             <div className={styles.inlineCenter} style={{ gap: 12, marginBottom: 16 }}>
-              <span className={styles.tile} style={{ width: 46, height: 46, background: "linear-gradient(135deg,#1f6bff,#6c4bf5)", borderRadius: 13 }}>
+              <span className={styles.tile} style={{ width: 46, height: 46, background: "linear-gradient(135deg,#1f6bff,#0ea5a0)", borderRadius: 13 }}>
                 <Zap size={24} strokeWidth={1.9} />
               </span>
               <div>
@@ -2785,7 +2902,7 @@ function ScreenSuccess({ state, go }: SharedProps) {
           <p style={{ margin: "0 0 26px", color: "var(--body)", fontSize: 16, fontWeight: 600 }}>You now have access to all {paidNameBatch} names for {state.title || "this startup"}.</p>
 
           <div className={styles.card} style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 22, padding: 18, textAlign: "left" }}>
-            <span className={styles.tile} style={{ width: 46, height: 46, background: "linear-gradient(135deg,#1f6bff,#6c4bf5)", borderRadius: 13 }}>
+            <span className={styles.tile} style={{ width: 46, height: 46, background: "linear-gradient(135deg,#1f6bff,#0ea5a0)", borderRadius: 13 }}>
               <Zap size={24} strokeWidth={1.9} />
             </span>
             <div style={{ flex: 1 }}>
@@ -2815,7 +2932,7 @@ function ScreenSuccess({ state, go }: SharedProps) {
 }
 
 function Confetti() {
-  const colors = ["#1f6bff", "#6c4bf5", "#ff5b2e", "#f5a300", "#11a39a", "#f0508a"];
+  const colors = ["#1f6bff", "#0ea5a0", "#ff5b2e", "#f5a300", "#11a39a", "#f0508a"];
   return (
     <div style={{ position: "absolute", inset: 0, overflow: "visible", pointerEvents: "none" }} aria-hidden="true">
       {Array.from({ length: 26 }, (_, index) => {

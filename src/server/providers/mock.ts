@@ -14,6 +14,8 @@ function hashish(value: string) {
   return hash;
 }
 
+const socialPlatforms = ["x", "instagram", "tiktok", "linkedin", "youtube"] as const;
+
 function confidenceForLabel(label: ProviderResultInput["label"], positiveConfidence: ProviderResultInput["confidence"] = "medium") {
   if (label === "possible_conflict_found") return "high";
   if (label === "source_not_checked" || label === "source_unavailable" || label === "provider_error") return "unknown";
@@ -157,21 +159,32 @@ export const mockSocialAdapter: ProviderAdapter = {
   checkType: "social",
   inputSchema: providerInputSchema,
   async run({ candidate }) {
-    return [
-      {
+    const handle = candidate.name.toLowerCase().replace(/[^a-z0-9._-]/g, "").slice(0, 28) || "name";
+    return socialPlatforms.map((platform) => {
+      const bucket = hashish(`${candidate.name}:${platform}`) % 7;
+      const label =
+        bucket === 0
+          ? "possible_conflict_found"
+          : bucket === 1
+            ? "inconclusive_result"
+            : "no_obvious_conflict_found_in_this_screen";
+      return {
         provider: this.provider,
         providerVersion: this.version,
         checkType: this.checkType,
-        label: "source_not_checked",
-        source: "social checks deferred",
-        query: candidate.name,
-        matchedFields: [],
-        summary: "Social handle checks were not run in this configured screen.",
-        confidence: "unknown",
-        freshness: "not-checked",
+        label,
+        source: `mock ${platform} public profile`,
+        query: `${platform} @${handle}`,
+        matchedFields: label === "possible_conflict_found" ? [`${platform} handle signal`] : [],
+        summary:
+          label === "no_obvious_conflict_found_in_this_screen"
+            ? `No obvious ${platform} handle signal was found in this screen.`
+            : `The ${platform} handle signal requires review before launch.`,
+        confidence: confidenceForLabel(label, "low"),
+        freshness: "mock-fixture",
         occurredAt: now()
-      }
-    ];
+      };
+    });
   }
 };
 

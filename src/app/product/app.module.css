@@ -19,7 +19,7 @@
   --warn-tint: #fff5da;
   --bad: #e5484d;
   --bad-tint: #fdecec;
-  --tile-purple: #6c4bf5;
+  --tile-purple: #0f8f7e;
   --tile-teal: #11a39a;
   --tile-orange: #ff5b2e;
   --tile-blue: #1f6bff;
@@ -489,17 +489,41 @@
   position: absolute;
   left: -300px;
   top: 140px;
-  width: 330px;
+  width: 390px;
+  height: 340px;
   pointer-events: none;
-  filter: drop-shadow(0 24px 34px rgba(18, 32, 66, 0.18));
-  transform: rotate(-7deg);
+  filter: drop-shadow(0 24px 34px rgba(18, 32, 66, 0.16));
+  transform: rotate(-5deg);
 }
 
 .paperImage {
+  position: absolute;
   display: block;
-  width: 100%;
   height: auto;
-  border-radius: 22px;
+  border-radius: 0;
+}
+
+.paperImageSheet {
+  left: 56px;
+  top: 8px;
+  width: 230px;
+  transform: rotate(8deg);
+}
+
+.paperImageSticky {
+  left: 0;
+  top: 42px;
+  width: 330px;
+  transform: rotate(-6deg);
+}
+
+.authPanel .paperNote {
+  position: relative;
+  left: auto;
+  top: auto;
+  width: 280px;
+  height: 250px;
+  filter: drop-shadow(0 22px 32px rgba(0, 0, 0, 0.18));
 }
 
 .orbitWrap {
@@ -559,7 +583,7 @@
   width: 76px;
   height: 76px;
   margin: auto;
-  background: linear-gradient(135deg, #1f6bff, #6c4bf5);
+  background: linear-gradient(135deg, #1f6bff, #0ea5a0);
   border-radius: 22px;
   box-shadow: 0 16px 38px rgba(31, 107, 255, 0.4);
   animation: floaty 2.6s var(--ease) infinite;
@@ -821,6 +845,11 @@
   border-radius: 10px;
 }
 
+.evidenceBannerIcon svg,
+.reportStatusIcon svg {
+  display: block;
+}
+
 .evidenceBannerReady .evidenceBannerIcon {
   color: var(--ok);
   background: #fff;
@@ -832,7 +861,7 @@
 }
 
 .evidenceBanner strong,
-.evidenceBanner span {
+.evidenceBanner > div > span {
   display: block;
 }
 
@@ -841,7 +870,7 @@
   font-size: 14.5px;
 }
 
-.evidenceBanner span {
+.evidenceBanner > div > span {
   margin-top: 2px;
   color: var(--body);
   font-size: 13px;
@@ -875,6 +904,22 @@
   color: var(--ok);
   background: var(--ok-tint);
   border-color: rgba(21, 163, 90, 0.16);
+}
+
+.availMuted {
+  color: var(--meta);
+  background: #f7f8fb;
+}
+
+.availChip strong {
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.availMuted strong {
+  color: var(--meta);
 }
 
 .evidenceEmpty {
@@ -999,7 +1044,7 @@
 }
 
 .reportStatus strong,
-.reportStatus span {
+.reportStatus > div > span {
   display: block;
 }
 
@@ -1008,7 +1053,7 @@
   font-size: 13.5px;
 }
 
-.reportStatus span {
+.reportStatus > div > span {
   margin-top: 2px;
   color: var(--body);
   font-size: 12.5px;
@@ -1065,7 +1110,7 @@
   padding: 30px 32px;
   overflow: hidden;
   color: #fff;
-  background: linear-gradient(120deg, #1f6bff 0%, #3b5bf0 55%, #6c4bf5 100%);
+  background: linear-gradient(120deg, #0f4f62 0%, #0f7f75 58%, #e9863a 100%);
   border-radius: var(--r-card-lg);
   box-shadow: var(--sh-hi);
 }
@@ -1376,6 +1421,12 @@
   grid-template-columns: 1fr 1fr;
 }
 
+.authGrid > div:first-child {
+  min-width: 0;
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
 .authPanel {
   position: relative;
   display: flex;
@@ -1384,11 +1435,22 @@
   padding: 16% 48px 48px;
   overflow: hidden;
   color: #fff;
-  background: linear-gradient(150deg, #1f6bff, #3b5bf0 50%, #6c4bf5);
+  background:
+    radial-gradient(circle at 78% 18%, rgba(255, 255, 255, 0.18), transparent 28%),
+    linear-gradient(150deg, #123238 0%, #0f766e 54%, #d97731 100%);
 }
 
 .clerkAuthShell {
   width: 100%;
+  overflow: visible;
+}
+
+.clerkAuthShell :global(.cl-rootBox),
+.clerkAuthShell :global(.cl-cardBox),
+.clerkAuthShell :global(.cl-card) {
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
 }
 
 .authLoading {
@@ -1559,7 +1621,7 @@
   top: 26%;
   width: 96%;
   height: 20%;
-  background: linear-gradient(180deg, #6c4bf5, #5538e0);
+  background: linear-gradient(180deg, #0ea5a0, #0f766e);
   border-radius: 6px;
   transform: rotate(-3deg);
 }
