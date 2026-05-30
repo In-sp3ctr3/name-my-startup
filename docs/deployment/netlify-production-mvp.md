@@ -42,8 +42,10 @@ The repo includes `netlify.toml`:
 - Publish directory: `.next`
 - Functions directory: `netlify/functions`
 - Scheduled sweep: hourly
+- Secret scan false-positive omit keys: `AI_PRIMARY_PROVIDER,AI_FALLBACK_PROVIDER,JOB_EXECUTION_MODE`
 
 Netlify environment variables that server-side code needs must include the Functions scope. Netlify does not expose variables declared in `netlify.toml` to serverless functions at runtime.
+`SECRETS_SCAN_OMIT_KEYS` is only for non-secret enum-style config values that appear naturally in source code. Do not add real secret keys such as `OPENAI_API_KEY`, `DATABASE_URL`, `CLERK_SECRET_KEY`, `ANON_SESSION_SECRET`, or `JOB_RUNNER_SECRET`.
 
 Netlify still needs the Git repository connected through the dashboard.
 
