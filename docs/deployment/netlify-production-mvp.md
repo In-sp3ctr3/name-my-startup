@@ -43,6 +43,7 @@ The repo includes `netlify.toml`:
 - Functions directory: `netlify/functions`
 - Scheduled sweep: hourly
 - Secret scan false-positive omit keys: `AI_PRIMARY_PROVIDER,AI_FALLBACK_PROVIDER,JOB_EXECUTION_MODE`
+- Edge 404 redirects for common secret/config scanner paths such as `/.env*`, `/api/env`, `/api/config`, `/config*`, `/settings.js`, `/js/env.js`, and `/js/config.js`.
 
 Netlify environment variables that server-side code needs must include the Functions scope. Netlify does not expose variables declared in `netlify.toml` to serverless functions at runtime.
 `SECRETS_SCAN_OMIT_KEYS` is only for non-secret enum-style config values that appear naturally in source code. Do not add real secret keys such as `OPENAI_API_KEY`, `DATABASE_URL`, `CLERK_SECRET_KEY`, `ANON_SESSION_SECRET`, or `JOB_RUNNER_SECRET`.
