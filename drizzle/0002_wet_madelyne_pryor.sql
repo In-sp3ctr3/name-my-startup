@@ -1,0 +1,1 @@
+ALTER TABLE "provider_results" ADD COLUMN "confidence" text DEFAULT 'unknown' NOT NULL;

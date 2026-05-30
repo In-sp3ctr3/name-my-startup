@@ -1,0 +1,98 @@
+{
+  "product": "Namelift",
+  "scope": "Internal post-CTA product flow only. The landing page remains outside this redesign.",
+  "sourceOfTruth": "/Users/jadanjones/Downloads/NameShark.zip",
+  "businessModel": {
+    "freeSprint": "The first account-less visitor sprint gets 3 fully checked names.",
+    "paidPack": "Every paid startup uses a one-time $5 Launch Pack for 50 names.",
+    "authGate": "Login or signup is required before payment and before account routes."
+  },
+  "primaryFlow": [
+    {
+      "route": "/start",
+      "screen": "Brief composer",
+      "goal": "Collect a one-line startup brief and name styles, then generate 3 free names when eligible or route to auth and checkout for the Launch Pack.",
+      "requiredInteractions": ["submit-brief", "choose-name-style", "open-history-menu", "login-link"]
+    },
+    {
+      "route": "/app/new/describe",
+      "screen": "Brief composer",
+      "goal": "Authenticated/deep-link version of the same composer.",
+      "requiredInteractions": ["submit-brief", "choose-name-style", "open-history-menu", "account-link"]
+    },
+    {
+      "route": "/app/new/generating",
+      "screen": "Generating",
+      "goal": "Show the animated naming progress checklist before routing to free results or paid success.",
+      "requiredInteractions": ["timed-progress"]
+    },
+    {
+      "route": "/app/projects/[projectId]/results",
+      "screen": "Results",
+      "goal": "Show 3 fully checked free names, the Launch Pack boundary, non-data decoy teaser rows, and after unlock the searchable/filterable 50-name bundle in batches.",
+      "requiredInteractions": ["save-name", "paid-boundary-cta", "keep-starters", "search-paid-names", "filter-paid-names", "sort-paid-names", "show-more-names", "expand-report", "select-name", "copy-domain", "open-porkbun", "export-report"]
+    },
+    {
+      "route": "/login",
+      "screen": "Login",
+      "goal": "Authenticate the demo user and resume checkout or account routes.",
+      "requiredInteractions": ["submit-login", "continue-with-google", "switch-to-signup"]
+    },
+    {
+      "route": "/signup",
+      "screen": "Signup",
+      "goal": "Create the demo account and resume checkout or dashboard.",
+      "requiredInteractions": ["submit-signup", "continue-with-google", "switch-to-login"]
+    },
+    {
+      "route": "/checkout/launch-pack",
+      "screen": "Checkout or success",
+      "goal": "Simulate the one-time $5 Launch Pack payment, show the order summary, then show the All set success state.",
+      "requiredInteractions": ["pay-launch-pack", "return-to-results", "cancel-or-keep-free-starters", "view-all-50-names"]
+    }
+  ],
+  "secondaryRoutes": [
+    {
+      "route": "/app",
+      "screen": "Projects",
+      "goal": "Authed naming history with search, a new sprint card, and project cards."
+    },
+    {
+      "route": "/app/saved",
+      "screen": "Saved names",
+      "goal": "Authed shortlist of saved names with copy and Porkbun actions."
+    },
+    {
+      "route": "/app/projects/[projectId]/shortlist",
+      "screen": "Saved names",
+      "goal": "Project-level shortlist view using the same saved-name presentation."
+    },
+    {
+      "route": "/app/reports",
+      "screen": "Reports",
+      "goal": "Authed markdown report export entry point."
+    },
+    {
+      "route": "/app/projects/[projectId]/names/[nameId]/report",
+      "screen": "Name report",
+      "goal": "Deep link to the expanded evidence report for a single name."
+    },
+    {
+      "route": "/app/settings",
+      "screen": "Settings",
+      "goal": "Authed account profile, preferences, privacy, and danger-zone UI."
+    },
+    {
+      "route": "/app/billing",
+      "screen": "Billing",
+      "goal": "Authed per-startup Launch Pack status, compact pack history with load more/show less, and no credit-balance or remaining-name language."
+    }
+  ],
+  "deferredExternalIntegrations": [
+    "Hosted Lemon Squeezy or Stripe checkout",
+    "Production authentication and restore links",
+    "Server-side Porkbun/domain availability checks",
+    "Social-handle and trademark provider checks",
+    "Payment, report export, deletion, and support audit events"
+  ]
+}

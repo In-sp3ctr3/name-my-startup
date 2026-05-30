@@ -1,0 +1,50 @@
+{
+  "name": "name-my-startup",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.18.3",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ai:eval": "vitest run tests/evals",
+    "ai:eval:live": "AI_EVAL_LIVE=true vitest run tests/evals",
+    "copy:lint": "node scripts/copy-lint.mjs",
+    "frontend:raw-svg": "node scripts/raw-svg-audit.mjs",
+    "frontend:dead-clicks": "node scripts/frontend-dead-click-audit.mjs",
+    "frontend:routes": "playwright test tests/playwright/frontend-harness.spec.ts",
+    "frontend:qa": "pnpm frontend:raw-svg && pnpm frontend:dead-clicks && pnpm frontend:routes",
+    "verify": "pnpm copy:lint && pnpm typecheck && pnpm lint && pnpm test",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^6.35.0",
+    "@neondatabase/serverless": "^1.0.2",
+    "drizzle-orm": "^0.45.2",
+    "lucide-react": "^1.16.0",
+    "motion": "^12.40.0",
+    "next": "^15.5.6",
+    "openai": "^6.7.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^24.9.2",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.5",
+    "eslint": "^9.38.0",
+    "eslint-config-next": "^15.5.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
