@@ -9,7 +9,7 @@ import { namesForCheckedRecommendations } from "@/server/selection";
 
 export async function POST(request: Request, { params }: { params: Promise<{ projectId: string }> }) {
   try {
-    const actor = await getCurrentActor();
+    const actor = await getCurrentActor({ allowAnonymous: true });
     const { projectId } = await params;
     const snapshot = await getProjectSnapshot(actor, projectId);
     if (!snapshot) return NextResponse.json({ error: "Project not found", code: "project_not_found" }, { status: 404 });
