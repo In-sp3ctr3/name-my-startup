@@ -1186,6 +1186,7 @@ async function updateJobRun(
   patch: Partial<Pick<JobRun, "status" | "resultPayload" | "errorMessage" | "startedAt" | "completedAt" | "lockedAt" | "lockedBy" | "runAfter">> & {
     incrementAttempts?: boolean;
     clearLock?: boolean;
+    clearError?: boolean;
   }
 ) {
   const db = database();
@@ -1200,7 +1201,7 @@ async function updateJobRun(
       .set({
         status: patch.status,
         resultPayload: patch.resultPayload,
-        errorMessage: patch.errorMessage,
+        errorMessage: patch.clearError ? null : patch.errorMessage,
         attempts: patch.incrementAttempts ? existing.attempts + 1 : existing.attempts,
         runAfter: patch.runAfter ? new Date(patch.runAfter) : existing.runAfter,
         lockedAt: patch.clearLock ? null : patch.lockedAt ? new Date(patch.lockedAt) : existing.lockedAt,
@@ -1223,7 +1224,7 @@ async function updateJobRun(
   Object.assign(job, {
     status: patch.status ?? job.status,
     resultPayload: patch.resultPayload ?? job.resultPayload,
-    errorMessage: patch.errorMessage,
+    errorMessage: patch.clearError ? undefined : patch.errorMessage,
     attempts: patch.incrementAttempts ? job.attempts + 1 : job.attempts,
     runAfter: patch.runAfter ?? job.runAfter,
     lockedAt: patch.clearLock ? undefined : (patch.lockedAt ?? job.lockedAt),
@@ -1243,7 +1244,7 @@ export function startJobRun(actor: Actor, jobId: string) {
 
 export function completeJobRun(actor: Actor, jobId: string, resultPayload: unknown = {}) {
   const timestamp = now();
-  return updateJobRun(actor, jobId, { status: "succeeded", resultPayload, completedAt: timestamp, clearLock: true });
+  return updateJobRun(actor, jobId, { status: "succeeded", resultPayload, completedAt: timestamp, clearLock: true, clearError: true });
 }
 
 export function failJobRun(actor: Actor, jobId: string, error: unknown) {
