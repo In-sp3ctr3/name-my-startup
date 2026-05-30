@@ -8,7 +8,7 @@ export default async function handler(request: Request) {
 
   const origin = originFromRequest(request);
 
-  await fetch(`${origin}/api/internal/jobs/drain`, {
+  const response = await fetch(`${origin}/api/internal/jobs/drain`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -16,4 +16,7 @@ export default async function handler(request: Request) {
     },
     body: JSON.stringify({ sweep: true, workerId: "netlify-scheduled-sweep" })
   });
+  if (!response.ok) {
+    throw new Error(`Job sweep failed with status ${response.status}: ${await response.text()}`);
+  }
 }

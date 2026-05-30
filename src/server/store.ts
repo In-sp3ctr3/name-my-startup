@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import * as dbSchema from "@/db/schema";
 import { env, hasDatabaseConfig, inMemoryStoreAllowed } from "@/env";
@@ -1252,8 +1252,6 @@ export function failJobRun(actor: Actor, jobId: string, error: unknown) {
   return updateJobRun(actor, jobId, { status: "failed", errorMessage: message.slice(0, 500), completedAt: timestamp, clearLock: true });
 }
 
-type ClaimedJobRunRow = typeof dbSchema.jobRuns.$inferSelect;
-
 function rowsFromExecuteResult<T>(result: unknown): T[] {
   if (Array.isArray(result)) return result as T[];
   if (result && typeof result === "object" && "rows" in result && Array.isArray((result as { rows: unknown }).rows)) {
@@ -1267,7 +1265,7 @@ export async function claimNextQueuedJobRun(workerId: string) {
   const timestamp = now();
 
   if (db) {
-    const result = await db.execute(sql<ClaimedJobRunRow>`
+    const result = await db.execute(sql<{ id: string }>`
       with next_job as (
         select id
         from ${dbSchema.jobRuns}
@@ -1286,9 +1284,11 @@ export async function claimNextQueuedJobRun(workerId: string) {
           updated_at = now()
       where id = (select id from next_job)
         and status = 'queued'
-      returning *
+      returning id
     `);
-    const [row] = rowsFromExecuteResult<ClaimedJobRunRow>(result);
+    const [claimed] = rowsFromExecuteResult<{ id: string }>(result);
+    if (!claimed) return null;
+    const [row] = await db.select().from(dbSchema.jobRuns).where(eq(dbSchema.jobRuns.id, claimed.id)).limit(1);
     return row ? mapJobRun(row) : null;
   }
 
@@ -1312,7 +1312,7 @@ export async function requeueStaleJobRuns(staleBefore: Date) {
   const timestamp = now();
 
   if (db) {
-    const requeued = await db.execute(sql<ClaimedJobRunRow>`
+    const requeued = await db.execute(sql<{ id: string }>`
       update ${dbSchema.jobRuns}
       set status = 'queued',
           locked_at = null,
@@ -1324,9 +1324,9 @@ export async function requeueStaleJobRuns(staleBefore: Date) {
         and locked_at is not null
         and locked_at < ${staleBefore}
         and attempts < max_attempts
-      returning *
+      returning id
     `);
-    const failed = await db.execute(sql<ClaimedJobRunRow>`
+    const failed = await db.execute(sql<{ id: string }>`
       update ${dbSchema.jobRuns}
       set status = 'failed',
           locked_at = null,
@@ -1338,11 +1338,17 @@ export async function requeueStaleJobRuns(staleBefore: Date) {
         and locked_at is not null
         and locked_at < ${staleBefore}
         and attempts >= max_attempts
-      returning *
+      returning id
     `);
+    const requeuedIds = rowsFromExecuteResult<{ id: string }>(requeued).map((row) => row.id);
+    const failedIds = rowsFromExecuteResult<{ id: string }>(failed).map((row) => row.id);
+    const [requeuedRows, failedRows] = await Promise.all([
+      requeuedIds.length ? db.select().from(dbSchema.jobRuns).where(inArray(dbSchema.jobRuns.id, requeuedIds)) : Promise.resolve([]),
+      failedIds.length ? db.select().from(dbSchema.jobRuns).where(inArray(dbSchema.jobRuns.id, failedIds)) : Promise.resolve([])
+    ]);
     return {
-      requeued: rowsFromExecuteResult<ClaimedJobRunRow>(requeued).map(mapJobRun),
-      failed: rowsFromExecuteResult<ClaimedJobRunRow>(failed).map(mapJobRun)
+      requeued: requeuedRows.map(mapJobRun),
+      failed: failedRows.map(mapJobRun)
     };
   }
 

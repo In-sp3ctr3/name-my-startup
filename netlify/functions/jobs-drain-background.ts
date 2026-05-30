@@ -9,7 +9,7 @@ export default async function handler(request: Request) {
   const origin = originFromRequest(request);
   const body = (await request.text().catch(() => "")) || "{}";
 
-  await fetch(`${origin}/api/internal/jobs/drain`, {
+  const response = await fetch(`${origin}/api/internal/jobs/drain`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -17,4 +17,7 @@ export default async function handler(request: Request) {
     },
     body
   });
+  if (!response.ok) {
+    throw new Error(`Job drain failed with status ${response.status}: ${await response.text()}`);
+  }
 }
