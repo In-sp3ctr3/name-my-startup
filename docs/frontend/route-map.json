@@ -9,6 +9,36 @@
   },
   "primaryFlow": [
     {
+      "route": "/pricing",
+      "screen": "Pricing",
+      "goal": "Public payment-review page that states the 3-name free preview, $5 one-time Launch Pack, 50-name paid deliverable, no subscription, and non-consulting positioning.",
+      "requiredInteractions": ["start-free", "launch-pack-cta", "policy-navigation"]
+    },
+    {
+      "route": "/terms",
+      "screen": "Terms of Service",
+      "goal": "Public terms page explaining digital software access, AI/evidence limitations, acceptable use, payment handling, and support contact.",
+      "requiredInteractions": ["policy-navigation"]
+    },
+    {
+      "route": "/privacy",
+      "screen": "Privacy Policy",
+      "goal": "Public privacy page explaining account data, anonymous sessions, project inputs, generated outputs, payment metadata, AI/evidence providers, cookies, sharing, and data requests.",
+      "requiredInteractions": ["policy-navigation"]
+    },
+    {
+      "route": "/refund-policy",
+      "screen": "Refund Policy",
+      "goal": "Public refund page explaining digital delivery, 7-day review path for duplicate charge/non-delivery/technical access issues, and payment-provider handling.",
+      "requiredInteractions": ["policy-navigation"]
+    },
+    {
+      "route": "/contact",
+      "screen": "Contact",
+      "goal": "Public support page with support email, response-time expectation, product summary, and self-serve/non-consulting positioning.",
+      "requiredInteractions": ["support-email", "start-product", "view-pricing"]
+    },
+    {
       "route": "/start",
       "screen": "Brief composer",
       "goal": "Collect a one-line startup brief and name styles, then generate 3 free names when eligible or route to auth and checkout for the Launch Pack.",

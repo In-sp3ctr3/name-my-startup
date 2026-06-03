@@ -306,6 +306,26 @@ const iconByKey: Record<StoredProject["iconKey"], LucideIcon> = {
 };
 
 const resultIconOptions = [Sparkles, Waves, Star, Cpu, Shield, Zap];
+const routeKeys: RouteKey[] = [
+  "brief",
+  "generating",
+  "results",
+  "checkout",
+  "success",
+  "dashboard",
+  "saved",
+  "settings",
+  "billing",
+  "login",
+  "signup",
+  "reports",
+  "report",
+  "shortlist"
+];
+const routeKeySet = new Set<RouteKey>(routeKeys);
+const payIntentSet = new Set<NonNullable<PayIntent>>(["unlockCurrent", "newSprint"]);
+const projectIconKeySet = new Set<StoredProject["iconKey"]>(["waves", "sparkles", "bolt", "star", "file"]);
+const briefStyleSet = new Set<BriefStyle>(STYLE_OPTIONS.map((item) => item.key));
 
 const socialIcons: Array<[keyof EvidenceReport["socials"], string, LucideIcon]> = [
   ["x", "X", X],
@@ -333,9 +353,118 @@ function isLocalProjectId(projectId: string) {
   return projectId.startsWith("sprint-");
 }
 
+function objectRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function stringProp(value: Record<string, unknown>, key: string, fallback = "") {
+  const candidate = value[key];
+  return typeof candidate === "string" ? candidate : fallback;
+}
+
+function routeOrNull(value: unknown): RouteKey | null {
+  return typeof value === "string" && routeKeySet.has(value as RouteKey) ? (value as RouteKey) : null;
+}
+
+function payIntentOrNull(value: unknown): PayIntent {
+  return typeof value === "string" && payIntentSet.has(value as NonNullable<PayIntent>) ? (value as NonNullable<PayIntent>) : null;
+}
+
+function sanitizeBriefStyles(value: unknown): BriefStyle[] {
+  if (!Array.isArray(value)) return ["Modern"];
+  const styles = value.filter((item): item is BriefStyle => typeof item === "string" && briefStyleSet.has(item as BriefStyle));
+  return styles.length > 0 ? styles : ["Modern"];
+}
+
+function sanitizePendingBrief(value: unknown): PendingBrief | null {
+  const record = objectRecord(value);
+  if (!record) return null;
+  const projectId = stringProp(record, "projectId").trim();
+  const title = stringProp(record, "title").trim();
+  const brief = stringProp(record, "brief").trim();
+  if (!projectId || !title || !brief) return null;
+  return {
+    projectId,
+    title,
+    brief,
+    styles: sanitizeBriefStyles(record.styles)
+  };
+}
+
+function sanitizeActiveSprint(value: unknown): ActiveSprint | null {
+  const pending = sanitizePendingBrief(value);
+  const record = objectRecord(value);
+  if (!pending || !record) return null;
+  return {
+    ...pending,
+    paidSprint: record.paidSprint === true
+  };
+}
+
+function sanitizeStoredProject(value: unknown): StoredProject | null {
+  const record = objectRecord(value);
+  if (!record) return null;
+  const id = stringProp(record, "id").trim();
+  const title = stringProp(record, "title").trim();
+  const brief = stringProp(record, "brief").trim();
+  if (!id || !title || !brief) return null;
+  const count = record.count === 50 ? 50 : 3;
+  const status = record.status === "unlocked" ? "unlocked" : "free";
+  const iconKey = typeof record.iconKey === "string" && projectIconKeySet.has(record.iconKey as StoredProject["iconKey"]) ? (record.iconKey as StoredProject["iconKey"]) : "sparkles";
+  return {
+    id,
+    title,
+    brief,
+    count,
+    status,
+    when: stringProp(record, "when", "Recent"),
+    tileColor: stringProp(record, "tileColor", "--tile-blue"),
+    iconKey
+  };
+}
+
+function sanitizeBillingHistoryItem(value: unknown): BillingHistoryItem | null {
+  const record = objectRecord(value);
+  if (!record) return null;
+  const id = stringProp(record, "id").trim();
+  const title = stringProp(record, "title").trim();
+  const description = stringProp(record, "description").trim();
+  const price = stringProp(record, "price").trim();
+  const when = stringProp(record, "when").trim();
+  if (!id || !title || !description || !price || !when) return null;
+  return {
+    id,
+    projectId: stringProp(record, "projectId") || undefined,
+    title,
+    description,
+    names: typeof record.names === "number" && Number.isFinite(record.names) ? record.names : freeNameBatch,
+    price,
+    when,
+    status: record.status === "unlocked" ? "unlocked" : "free",
+    createdAt: stringProp(record, "createdAt") || undefined
+  };
+}
+
+function sanitizeCurrentPack(value: unknown): BillingSummary["currentPack"] | null {
+  const record = objectRecord(value);
+  if (!record) return null;
+  const projectId = stringProp(record, "projectId").trim();
+  const projectName = stringProp(record, "projectName").trim();
+  const price = stringProp(record, "price").trim();
+  if (!projectId || !projectName || !price) return null;
+  return {
+    projectId,
+    projectName,
+    names: typeof record.names === "number" && Number.isFinite(record.names) ? record.names : paidNameBatch,
+    price,
+    status: "unlocked"
+  };
+}
+
 function normalizeState(value: unknown): NameliftState {
   if (!value || typeof value !== "object") return defaultState;
   const partial = value as Partial<NameliftState>;
+  const record = value as Record<string, unknown>;
   const candidatesByProject =
     partial.candidatesByProject && typeof partial.candidatesByProject === "object"
       ? Object.fromEntries(
@@ -357,19 +486,28 @@ function normalizeState(value: unknown): NameliftState {
   const reportsByProject = partial.reportsByProject && typeof partial.reportsByProject === "object" ? partial.reportsByProject : {};
   return {
     ...defaultState,
-    ...partial,
-    saved: Array.isArray(partial.saved) ? partial.saved : [],
-    unlockedProjects: Array.isArray(partial.unlockedProjects) ? partial.unlockedProjects : [],
-    styles: Array.isArray(partial.styles) && partial.styles.length > 0 ? partial.styles : ["Modern"],
-    projects: Array.isArray(partial.projects) ? partial.projects : [],
+    authed: partial.authed === true,
+    freeUsed: partial.freeUsed === true,
+    saved: Array.isArray(partial.saved) ? partial.saved.filter((item): item is string => typeof item === "string") : [],
+    selected: typeof partial.selected === "string" ? partial.selected : null,
+    unlockedProjects: Array.isArray(partial.unlockedProjects) ? partial.unlockedProjects.filter((item): item is string => typeof item === "string") : [],
+    currentProjectId: stringProp(record, "currentProjectId", defaultState.currentProjectId).trim() || defaultState.currentProjectId,
+    title: stringProp(record, "title", defaultState.title).trim() || defaultState.title,
+    brief: stringProp(record, "brief", defaultState.brief).trim() || defaultState.brief,
+    styles: sanitizeBriefStyles(partial.styles),
+    afterAuth: routeOrNull(partial.afterAuth),
+    payIntent: payIntentOrNull(partial.payIntent),
+    pendingBrief: sanitizePendingBrief(partial.pendingBrief),
+    activeSprint: sanitizeActiveSprint(partial.activeSprint),
+    projects: Array.isArray(partial.projects) ? partial.projects.map(sanitizeStoredProject).filter((project): project is StoredProject => Boolean(project)) : [],
     candidatesByProject,
     screeningRunsByProject,
     screeningResultsByProject,
     reportsByProject,
-    billingHistory: Array.isArray(partial.billingHistory) ? partial.billingHistory : [],
+    billingHistory: Array.isArray(partial.billingHistory) ? partial.billingHistory.map(sanitizeBillingHistoryItem).filter((item): item is BillingHistoryItem => Boolean(item)) : [],
     billingCursor: typeof partial.billingCursor === "string" ? partial.billingCursor : null,
     billingTotal: typeof partial.billingTotal === "number" ? partial.billingTotal : 0,
-    currentPack: partial.currentPack ?? null
+    currentPack: sanitizeCurrentPack(partial.currentPack)
   };
 }
 
@@ -408,12 +546,14 @@ function writeStoredDraftState(state: NameliftState) {
 }
 
 function usePersistentState() {
-  const [state, setBaseState] = useState<NameliftState>(() => readStoredDraftState());
+  const [state, setBaseState] = useState<NameliftState>(defaultState);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     const stored = readStoredDraftState();
     setBaseState((current) => normalizeState({ ...current, ...localDraftState(stored) }));
     writeStoredDraftState(stored);
+    setHydrated(true);
   }, []);
 
   const setState = useCallback<Dispatch<SetStateAction<NameliftState>>>((updater) => {
@@ -424,7 +564,7 @@ function usePersistentState() {
     });
   }, []);
 
-  return [state, setState] as const;
+  return [state, setState, hydrated] as const;
 }
 
 function pathFor(route: RouteKey, state: NameliftState) {
@@ -951,9 +1091,14 @@ function ProductAppInner({
   authSession: AuthSession;
 }) {
   const router = useRouter();
-  const [state, setState] = usePersistentState();
+  const [state, setState, stateHydrated] = usePersistentState();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const activeScreen: ProductScreen = success ? "success" : screen;
+  const stateRef = useRef(state);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const onToast = useCallback((message: string, icon: LucideIcon = CheckCircle) => {
     const id = Math.random().toString(36).slice(2);
@@ -963,12 +1108,17 @@ function ProductAppInner({
 
   const go = useCallback(
     (route: RouteKey, patch: Partial<NameliftState> = {}) => {
-      const nextState = normalizeState({ ...state, ...patch });
+      const nextState = normalizeState({ ...stateRef.current, ...patch });
+      const nextPath = pathFor(route, nextState);
+      const currentPath = `${window.location.pathname}${window.location.search}`;
+      stateRef.current = nextState;
       setState(nextState);
-      router.push(pathFor(route, nextState));
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (currentPath !== nextPath) {
+        router.push(nextPath);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     },
-    [router, setState, state]
+    [router, setState]
   );
   const goLanding = useCallback(() => {
     router.push("/");
@@ -1010,7 +1160,10 @@ function ProductAppInner({
     go(storedNext, { authed: true, afterAuth: null });
   }, [activeScreen, authSession.clerkEnabled, authSession.loaded, authSession.signedIn, go, state.afterAuth]);
 
+  const accountLoadKey = authSession.clerkEnabled ? `${authSession.loaded}:${authSession.signedIn}` : String(state.authed);
+
   useEffect(() => {
+    if (authSession.clerkEnabled && !authSession.loaded) return;
     let cancelled = false;
     async function loadAccountState() {
       try {
@@ -1025,6 +1178,8 @@ function ProductAppInner({
         const billing = authenticatedBilling?.billing ?? me.billing;
         if (cancelled) return;
         setState((current) => {
+          const clientAuthSettled = authSession.clerkEnabled && authSession.loaded;
+          const nextAuthed = clientAuthSettled ? authSession.signedIn : current.authed || me.actor.authenticated;
           const apiProjects = me.projects.map(projectFromApi);
           const saved = me.savedNames.map((candidate) => candidate.id);
           const savedCandidatesByProject = candidatesByProjectFromApi(me.savedNames);
@@ -1038,7 +1193,7 @@ function ProductAppInner({
           const restoreAnonymousFreeProject = Boolean(!me.actor.authenticated && me.freePreviewUsed && currentProject && !current.activeSprint);
           return {
             ...current,
-            authed: me.actor.authenticated,
+            authed: nextAuthed,
             freeUsed: me.freePreviewUsed,
             projects: apiProjects,
             saved,
@@ -1061,7 +1216,7 @@ function ProductAppInner({
     return () => {
       cancelled = true;
     };
-  }, [setState, state.authed]);
+  }, [accountLoadKey, authSession.clerkEnabled, authSession.loaded, authSession.signedIn, setState]);
 
   useEffect(() => {
     if (state.authed || state.activeSprint) return;
@@ -1088,7 +1243,7 @@ function ProductAppInner({
   } else if (activeScreen === "brief" || activeScreen === "vibe") {
     content = <ScreenBrief {...shared} />;
   } else if (activeScreen === "generating") {
-    content = <ScreenGenerating {...shared} />;
+    content = <ScreenGenerating {...shared} stateHydrated={stateHydrated} />;
   } else if (activeScreen === "results") {
     content = <ScreenResults {...shared} projectId={effectiveProjectId} />;
   } else if (activeScreen === "checkout") {
@@ -1495,7 +1650,7 @@ function PaperNote() {
   );
 }
 
-function ScreenGenerating({ state, go }: SharedProps) {
+function ScreenGenerating({ state, go, stateHydrated }: SharedProps & { stateHydrated: boolean }) {
   const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const taskRef = useRef<{ key: string; promise: Promise<{ route: RouteKey; patch: Partial<NameliftState> }> } | null>(null);
@@ -1505,8 +1660,12 @@ function ScreenGenerating({ state, go }: SharedProps) {
   const generationKey = `${sprint?.projectId ?? "no-sprint"}:${paidSprint ? "paid" : "free"}`;
 
   useEffect(() => {
+    if (!stateHydrated) return;
     if (!sprint) {
-      if (!taskRef.current && routedKeyRef.current === null) go(paidSprint ? "success" : "results");
+      if (!taskRef.current && routedKeyRef.current === null) {
+        routedKeyRef.current = "missing-sprint";
+        go(paidSprint ? "success" : "results");
+      }
       return;
     }
 
@@ -1663,6 +1822,7 @@ function ScreenGenerating({ state, go }: SharedProps) {
     generationKey,
     paidSprint,
     sprint,
+    stateHydrated,
     state.brief,
     state.candidatesByProject,
     state.freeUsed,
@@ -1679,7 +1839,7 @@ function ScreenGenerating({ state, go }: SharedProps) {
   const orbiters: Array<{ icon: LucideIcon; x: number; y: number }> = [AtSign, Camera, Globe, Music2, Briefcase, Shield].map((icon, index, arr) => {
     const angle = (index / arr.length) * Math.PI * 2;
     const radius = 96;
-    return { icon, x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
+    return { icon, x: Math.round(Math.cos(angle) * radius * 1000) / 1000, y: Math.round(Math.sin(angle) * radius * 1000) / 1000 };
   });
 
   return (

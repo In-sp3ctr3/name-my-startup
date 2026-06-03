@@ -168,6 +168,77 @@ test.describe("Namelift internal flow", () => {
     await expect(page.getByText("Stale Launch Pack")).toHaveCount(0);
   });
 
+  test("poisoned local draft state falls back without a client crash", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await resetDemoState(page);
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "namelift:internal-flow:v3",
+        JSON.stringify({
+          authed: "yes",
+          freeUsed: "also yes",
+          currentProjectId: 42,
+          title: null,
+          brief: { text: "not a string" },
+          styles: ["Modern", "NotARealStyle"],
+          afterAuth: "definitely-not-a-route",
+          payIntent: "steal-the-pack",
+          pendingBrief: { projectId: null, title: "Bad draft", brief: "" },
+          activeSprint: { projectId: 100, title: "Bad sprint", brief: "Bad sprint", paidSprint: "true" },
+          projects: [{ id: null, title: "Bad project", brief: "Bad project" }],
+          saved: [null, "safe-saved-id"],
+          unlockedProjects: [{ nope: true }, "safe-project-id"],
+          billingHistory: [{ id: "bad-history", title: null, description: "Bad", price: "$5", when: "Now" }],
+          currentPack: { projectId: null, projectName: "Bad pack", names: "50", price: "$5" }
+        })
+      );
+    });
+
+    await page.goto("/start");
+    await expect(page.getByRole("heading", { name: /let's name something unforgettable/i })).toBeVisible();
+    await expect(page.getByText(/application error/i)).toHaveCount(0);
+    await page.getByRole("textbox", { name: /the brief/i }).fill("A scheduling app for solo fitness coaches");
+    await expect(page.getByRole("button", { name: /generate 3 free names/i })).toBeEnabled();
+    expect(pageErrors).toEqual([]);
+  });
+
+  test("stale auth and project state does not enter an update loop", async ({ page }) => {
+    const pageErrors: string[] = [];
+    page.on("pageerror", (error) => pageErrors.push(error.message));
+    await resetDemoState(page);
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        "namelift:internal-flow:v3",
+        JSON.stringify({
+          authed: true,
+          freeUsed: true,
+          currentProjectId: "stale-free-project",
+          title: "Stale Free Project",
+          brief: "A stale localStorage project.",
+          activeSprint: null,
+          projects: [
+            {
+              id: "stale-free-project",
+              title: "Stale Free Project",
+              brief: "A stale localStorage project.",
+              count: 3,
+              status: "free",
+              when: "Just now",
+              tileColor: "--tile-orange",
+              iconKey: "sparkles"
+            }
+          ]
+        })
+      );
+    });
+
+    await page.goto("/app/projects/stale-free-project/results");
+    await expect(page.getByText(/application error/i)).toHaveCount(0);
+    await page.waitForTimeout(500);
+    expect(pageErrors).toEqual([]);
+  });
+
   test("billing history can expand and collapse", async ({ page }) => {
     await resetDemoState(page);
     const brief = (title: string) => ({

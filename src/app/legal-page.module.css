@@ -1,0 +1,274 @@
+.page {
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(7, 92, 255, 0.08), transparent 32%),
+    linear-gradient(180deg, #fff 0%, #f7faff 100%);
+}
+
+.header {
+  display: flex;
+  width: min(920px, calc(100% - 48px));
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  margin-inline: auto;
+  gap: 24px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: max-content;
+  font-size: 23px;
+  font-weight: 800;
+}
+
+.brandMark {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  color: #fff;
+  background: var(--blue);
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(7, 92, 255, 0.26);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: #101828;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.nav a {
+  transition: color 160ms ease;
+}
+
+.nav a:hover {
+  color: var(--blue);
+}
+
+.shell {
+  width: min(920px, calc(100% - 48px));
+  margin-inline: auto;
+  padding: 34px 0 72px;
+}
+
+.hero {
+  display: grid;
+  gap: 14px;
+  max-width: 760px;
+  padding: 42px 0 28px;
+}
+
+.eyebrow {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-family: var(--font-namelift), var(--font-sans), sans-serif;
+  font-size: clamp(38px, 7vw, 74px);
+  line-height: 0.94;
+  letter-spacing: 0;
+}
+
+.hero p {
+  max-width: 680px;
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.65;
+  font-weight: 600;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.meta span {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 12px;
+  color: #24405f;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.card {
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 40px rgba(17, 24, 39, 0.06);
+}
+
+.card h2 {
+  margin: 0 0 12px;
+  font-family: var(--font-namelift), var(--font-sans), sans-serif;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.card h3 {
+  margin: 20px 0 8px;
+  font-size: 16px;
+}
+
+.card p,
+.card li {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.7;
+  font-weight: 560;
+}
+
+.card p {
+  margin: 0 0 12px;
+}
+
+.card p:last-child {
+  margin-bottom: 0;
+}
+
+.card ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.priceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.priceCard {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.priceCardFeatured {
+  border: 2px solid var(--blue);
+  box-shadow: 0 20px 50px rgba(7, 92, 255, 0.12);
+}
+
+.priceLine {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.priceLine strong {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.priceLine span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  color: var(--blue);
+  background: #fff;
+  border: 2px solid var(--blue);
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.buttonPrimary {
+  color: #fff;
+  background: var(--blue);
+  box-shadow: var(--shadow-blue);
+}
+
+.footer {
+  display: flex;
+  width: min(920px, calc(100% - 48px));
+  align-items: center;
+  justify-content: space-between;
+  margin-inline: auto;
+  padding: 22px 0 34px;
+  gap: 18px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.footerLinks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+@media (max-width: 720px) {
+  .header,
+  .shell,
+  .footer {
+    width: min(100% - 32px, 920px);
+  }
+
+  .header,
+  .footer,
+  .nav {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .nav,
+  .footerLinks {
+    gap: 12px;
+  }
+
+  .priceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .card {
+    padding: 20px;
+  }
+}

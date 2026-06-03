@@ -16,7 +16,7 @@
     "copy:lint": "node scripts/copy-lint.mjs",
     "frontend:raw-svg": "node scripts/raw-svg-audit.mjs",
     "frontend:dead-clicks": "node scripts/frontend-dead-click-audit.mjs",
-    "frontend:routes": "playwright test tests/playwright/frontend-harness.spec.ts",
+    "frontend:routes": "playwright test tests/playwright",
     "frontend:qa": "pnpm frontend:raw-svg && pnpm frontend:dead-clicks && pnpm frontend:routes",
     "verify": "pnpm copy:lint && pnpm typecheck && pnpm lint && pnpm test",
     "db:generate": "drizzle-kit generate",

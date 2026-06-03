@@ -35,6 +35,14 @@ const navItems = [
   { label: "Pricing", href: "#pricing" }
 ];
 
+const footerLinks = [
+  { label: "Pricing", href: "/pricing" },
+  { label: "Terms", href: "/terms" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Refunds", href: "/refund-policy" },
+  { label: "Contact", href: "/contact" }
+];
+
 const signupHref = "/start";
 const loginHref = "/login";
 
@@ -721,13 +729,13 @@ export function LandingPage() {
             <Brand />
           </Link>
           <nav aria-label="Footer navigation">
-            {navItems.map((item) => (
-              <a key={item.href} href={item.href}>
+            {footerLinks.map((item) => (
+              <Link key={item.href} href={item.href}>
                 {item.label}
-              </a>
+              </Link>
             ))}
           </nav>
-          <p>© 2025 Namelift, Inc. All rights reserved.</p>
+          <p>© 2026 Namelift. Operated by SpectraLabsHQ.</p>
         </footer>
       </main>
     </MotionConfig>
